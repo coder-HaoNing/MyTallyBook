@@ -6,6 +6,7 @@ import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 
+import com.example.mytallybook.database.UserDataAccess;
 import com.example.mytallybook.model.User;
 import com.example.mytallybook.repository.UserRepository;
 
@@ -18,26 +19,41 @@ public class UserViewModel extends AndroidViewModel {
     
     public UserViewModel(@NonNull Application application) {
         super(application);
-        repository = new UserRepository(application);
-    }
-    
-    // 通过手机号获取用户
-    public LiveData<User> getUserByPhone(String phoneNumber) {
-        return repository.getUserByPhone(phoneNumber);
+        repository = UserRepository.getInstance(application);
     }
     
     // 用户登录
-    public LiveData<User> login(String phoneNumber, String password) {
-        return repository.login(phoneNumber, password);
+    public void login(String username, String password, UserDataAccess.GetUserCallback callback) {
+        repository.loginUser(username, password, callback);
+    }
+    
+    // 使用用户名或手机号登录
+    public void loginWithPhoneOrUsername(String usernameOrPhone, String password, UserDataAccess.GetUserCallback callback) {
+        repository.loginWithPhoneOrUsername(usernameOrPhone, password, callback);
     }
     
     // 注册新用户
-    public void register(User user) {
-        repository.register(user);
+    public void register(User user, UserDataAccess.InsertCallback callback) {
+        repository.registerUser(user, callback);
     }
     
-    // 检查手机号是否已存在
-    public boolean isPhoneNumberExists(String phoneNumber) {
-        return repository.isPhoneNumberExists(phoneNumber);
+    // 更新用户信息
+    public void updateUser(User user, UserDataAccess.UpdateCallback callback) {
+        repository.updateUser(user, callback);
+    }
+    
+    // 获取当前用户
+    public LiveData<User> getCurrentUser() {
+        return repository.getCurrentUser();
+    }
+    
+    // 设置当前用户
+    public void setCurrentUser(User user) {
+        repository.setCurrentUser(user);
+    }
+    
+    // 通过ID获取用户
+    public void getUserById(int userId, UserDataAccess.GetUserCallback callback) {
+        repository.getUserById(userId, callback);
     }
 }

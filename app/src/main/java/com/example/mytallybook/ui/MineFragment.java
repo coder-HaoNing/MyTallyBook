@@ -22,12 +22,15 @@ import com.example.mytallybook.R;
 import com.example.mytallybook.adapter.ExpenseRecordAdapter;
 import com.example.mytallybook.model.ExpenseRecord;
 import com.example.mytallybook.ui.auth.LoginActivity;
+import com.example.mytallybook.ui.settings.SettingsActivity;
 import com.example.mytallybook.viewmodel.ExpenseViewModel;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
@@ -40,6 +43,7 @@ public class MineFragment extends Fragment {
     private FloatingActionButton fabShare;
     private TextView textViewUsername; // 添加用户名显示
     private MaterialButton buttonLogout; // 添加退出登录按钮
+    private MaterialButton buttonSettings; // 添加设置按钮
     
     private List<ExpenseRecord> recordList;
     private DecimalFormat decimalFormat = new DecimalFormat("¥#,##0.00");
@@ -57,6 +61,7 @@ public class MineFragment extends Fragment {
         fabShare = view.findViewById(R.id.fabShare);
         textViewUsername = view.findViewById(R.id.textViewUsername); // 添加用户名显示
         buttonLogout = view.findViewById(R.id.buttonLogout); // 添加退出登录按钮
+        buttonSettings = view.findViewById(R.id.buttonSettings); // 添加设置按钮
         
         // 设置RecyclerView
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
@@ -84,15 +89,24 @@ public class MineFragment extends Fragment {
             adapter.setExpenseRecords(records);
         });
         
-        // 观察总收入
-        viewModel.getTotalIncome().observe(getViewLifecycleOwner(), income -> {
+        // 创建日期范围，用于获取所有时间段的收支统计
+        Calendar calendar = Calendar.getInstance();
+        Date endDate = calendar.getTime(); // 当前日期作为结束日期
+        
+        calendar.set(Calendar.YEAR, 2000);
+        calendar.set(Calendar.MONTH, 0);
+        calendar.set(Calendar.DAY_OF_MONTH, 1);
+        Date startDate = calendar.getTime(); // 2000年1月1日作为开始日期
+        
+        // 观察总收入，添加日期参数
+        viewModel.getTotalIncome(startDate, endDate).observe(getViewLifecycleOwner(), income -> {
             double incomeValue = income != null ? income : 0.0;
             textViewTotalIncome.setText(decimalFormat.format(incomeValue));
             updateTotalBalance();
         });
         
-        // 观察总支出
-        viewModel.getTotalExpense().observe(getViewLifecycleOwner(), expense -> {
+        // 观察总支出，添加日期参数
+        viewModel.getTotalExpense(startDate, endDate).observe(getViewLifecycleOwner(), expense -> {
             double expenseValue = expense != null ? expense : 0.0;
             textViewTotalExpense.setText(decimalFormat.format(expenseValue));
             updateTotalBalance();
@@ -106,6 +120,15 @@ public class MineFragment extends Fragment {
         
         // 添加退出登录按钮点击监听
         buttonLogout.setOnClickListener(v -> showLogoutConfirmation());
+        
+        // 添加设置按钮点击监听
+        buttonSettings.setOnClickListener(v -> openSettings());
+    }
+    
+    // 打开设置页面
+    private void openSettings() {
+        Intent intent = new Intent(getActivity(), SettingsActivity.class);
+        startActivity(intent);
     }
     
     // 显示退出登录确认对话框

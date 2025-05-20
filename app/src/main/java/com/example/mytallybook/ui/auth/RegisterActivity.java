@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.mytallybook.R;
+import com.example.mytallybook.database.UserDataAccess;
 import com.example.mytallybook.model.User;
 import com.example.mytallybook.viewmodel.UserViewModel;
 import com.google.android.material.textfield.TextInputEditText;
@@ -94,19 +95,42 @@ public class RegisterActivity extends AppCompatActivity {
             return;
         }
         
-        // 检查手机号是否已注册
-        if (userViewModel.isPhoneNumberExists(phoneNumber)) {
-            editTextPhone.setError("该手机号已注册");
-            return;
-        }
+        // 显示加载进度
+        buttonRegister.setEnabled(false);
+        buttonRegister.setText("注册中...");
         
         // 创建用户并注册
-        User newUser = new User(phoneNumber, username, password);
-        userViewModel.register(newUser);
+        User newUser = new User(username, password, phoneNumber, null); // 最后一个参数是email，设置为null
         
-        Toast.makeText(this, "注册成功，请登录", Toast.LENGTH_SHORT).show();
-        
-        // 返回登录页面
-        finish();
+        userViewModel.register(newUser, new UserDataAccess.InsertCallback() {
+            @Override
+            public void onInsertSuccess(User user) {
+                runOnUiThread(() -> {
+                    Toast.makeText(RegisterActivity.this, "注册成功，请登录", Toast.LENGTH_SHORT).show();
+                    
+                    // 重置按钮状态
+                    buttonRegister.setEnabled(true);
+                    buttonRegister.setText("注册");
+                    
+                    // 返回登录页面
+                    finish();
+                });
+            }
+
+            @Override
+            public void onInsertFailed(String errorMessage) {
+                runOnUiThread(() -> {
+                    Toast.makeText(RegisterActivity.this, "注册失败: " + errorMessage, Toast.LENGTH_SHORT).show();
+                    
+                    if(errorMessage.contains("UNIQUE constraint failed")) {
+                        editTextPhone.setError("该手机号或用户名已被注册");
+                    }
+                    
+                    // 重置按钮状态
+                    buttonRegister.setEnabled(true);
+                    buttonRegister.setText("注册");
+                });
+            }
+        });
     }
 }

@@ -8,6 +8,7 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.Transformations;
 
+import com.example.mytallybook.database.ExpenseRecordDataAccess;
 import com.example.mytallybook.model.ExpenseRecord;
 import com.example.mytallybook.repository.ExpenseRepository;
 
@@ -33,10 +34,8 @@ public class ExpenseViewModel extends AndroidViewModel {
     
     public ExpenseViewModel(@NonNull Application application) {
         super(application);
-        repository = new ExpenseRepository(application);
-        allRecords = repository.getAllRecords();
-        totalIncome = repository.getTotalIncome();
-        totalExpense = repository.getTotalExpense();
+        repository = ExpenseRepository.getInstance(application);
+        allRecords = repository.getAllExpenses();
         
         // 初始化为当前月份
         Calendar calendar = Calendar.getInstance();
@@ -92,44 +91,49 @@ public class ExpenseViewModel extends AndroidViewModel {
         return allRecords;
     }
     
+    // 获取特定用户的记录
+    public LiveData<List<ExpenseRecord>> getRecordsForUser(int userId) {
+        return repository.getAllExpensesForUser(userId);
+    }
+    
     // 获取指定日期范围的记录
     public LiveData<List<ExpenseRecord>> getRecordsByDateRange(Date startDate, Date endDate) {
         return repository.getRecordsByDateRange(startDate, endDate);
     }
     
-    // 获取特定类型的记录（收入/支出）
-    public LiveData<List<ExpenseRecord>> getRecordsByType(boolean isIncome) {
-        return repository.getRecordsByType(isIncome);
+    // 获取特定用户指定日期范围的记录
+    public LiveData<List<ExpenseRecord>> getRecordsByDateRangeForUser(int userId, Date startDate, Date endDate) {
+        return repository.getRecordsByDateRangeForUser(userId, startDate, endDate);
     }
     
     // 获取总收入
-    public LiveData<Double> getTotalIncome() {
-        return totalIncome;
+    public LiveData<Double> getTotalIncome(Date startDate, Date endDate) {
+        return repository.getTotalIncomeByDateRange(startDate, endDate);
     }
     
     // 获取总支出
-    public LiveData<Double> getTotalExpense() {
-        return totalExpense;
+    public LiveData<Double> getTotalExpense(Date startDate, Date endDate) {
+        return repository.getTotalExpenseByDateRange(startDate, endDate);
     }
     
     // 插入记录
-    public void insert(ExpenseRecord record) {
-        repository.insert(record);
+    public void insert(ExpenseRecord record, ExpenseRecordDataAccess.InsertCallback callback) {
+        repository.addExpense(record, callback);
     }
     
     // 更新记录
-    public void update(ExpenseRecord record) {
-        repository.update(record);
+    public void update(ExpenseRecord record, ExpenseRecordDataAccess.UpdateCallback callback) {
+        repository.updateExpense(record, callback);
     }
     
     // 删除记录
-    public void delete(ExpenseRecord record) {
-        repository.delete(record);
+    public void delete(ExpenseRecord record, ExpenseRecordDataAccess.DeleteCallback callback) {
+        repository.deleteExpense(record, callback);
     }
     
     // 获取特定记录
-    public LiveData<ExpenseRecord> getRecordById(long id) {
-        return repository.getRecordById(id);
+    public void getRecordById(int id, ExpenseRecordDataAccess.GetExpenseCallback callback) {
+        repository.getExpenseById(id, callback);
     }
     
     // 以下是新增的按月查询和统计功能
@@ -181,5 +185,19 @@ public class ExpenseViewModel extends AndroidViewModel {
     // 获取当前选择月份的支出
     public LiveData<Double> getMonthlyExpense() {
         return monthlyExpense;
+    }
+    
+    /**
+     * 刷新数据 - 重新获取当前月份的数据
+     * 通过重新设置selectedMonthDate触发LiveData转换，实现数据刷新
+     */
+    public void refreshData() {
+        if (selectedMonthDate.getValue() != null) {
+            // 获取当前选择的月份
+            Date currentSelectedDate = selectedMonthDate.getValue();
+            
+            // 重新设置相同的值会触发LiveData更新
+            selectedMonthDate.setValue(currentSelectedDate);
+        }
     }
 }

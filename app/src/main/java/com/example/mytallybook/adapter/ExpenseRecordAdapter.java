@@ -4,6 +4,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -11,6 +12,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.mytallybook.R;
 import com.example.mytallybook.model.ExpenseRecord;
+import com.example.mytallybook.util.CategoryIconUtil;
 
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
@@ -38,21 +40,34 @@ public class ExpenseRecordAdapter extends RecyclerView.Adapter<ExpenseRecordAdap
     public void onBindViewHolder(@NonNull ExpenseViewHolder holder, int position) {
         ExpenseRecord currentRecord = expenseRecords.get(position);
         
-        // 只显示日期，隐藏类别和备注
+        // 显示日期和类别
         holder.textViewDate.setText(dateFormat.format(currentRecord.getDate()));
-        holder.textViewCategory.setVisibility(View.GONE);
-        holder.textViewNote.setVisibility(View.GONE);
+        holder.textViewCategory.setText(currentRecord.getCategory());
+        holder.textViewCategory.setVisibility(View.VISIBLE);
+        
+        // 如果有备注则显示，否则隐藏
+        String note = currentRecord.getNote();
+        if (note != null && !note.trim().isEmpty()) {
+            holder.textViewNote.setText(note);
+            holder.textViewNote.setVisibility(View.VISIBLE);
+        } else {
+            holder.textViewNote.setVisibility(View.GONE);
+        }
         
         // 设置金额文字颜色
         String amountText;
         if (currentRecord.isIncome()) {
             amountText = "+" + decimalFormat.format(currentRecord.getAmount());
-            holder.textViewAmount.setTextColor(0xFF4CAF50); // 绿色
+            holder.textViewAmount.setTextColor(CategoryIconUtil.getCategoryColor(true)); // 绿色
         } else {
             amountText = "-" + decimalFormat.format(currentRecord.getAmount());
-            holder.textViewAmount.setTextColor(0xFFF44336); // 红色
+            holder.textViewAmount.setTextColor(CategoryIconUtil.getCategoryColor(false)); // 红色
         }
         holder.textViewAmount.setText(amountText);
+        
+        // 设置类别图标
+        int iconRes = CategoryIconUtil.getCategoryIcon(currentRecord.getCategory(), currentRecord.isIncome());
+        holder.imageViewCategoryIcon.setImageResource(iconRes);
         
         // 设置删除按钮点击事件
         holder.buttonDelete.setOnClickListener(v -> {
@@ -82,6 +97,7 @@ public class ExpenseRecordAdapter extends RecyclerView.Adapter<ExpenseRecordAdap
         private TextView textViewNote;
         private TextView textViewAmount;
         private ImageButton buttonDelete;
+        private ImageView imageViewCategoryIcon;
         
         public ExpenseViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -90,6 +106,7 @@ public class ExpenseRecordAdapter extends RecyclerView.Adapter<ExpenseRecordAdap
             textViewNote = itemView.findViewById(R.id.textViewNote);
             textViewAmount = itemView.findViewById(R.id.textViewAmount);
             buttonDelete = itemView.findViewById(R.id.buttonDelete);
+            imageViewCategoryIcon = itemView.findViewById(R.id.imageViewCategoryIcon);
             
             itemView.setOnClickListener(v -> {
                 int position = getAdapterPosition();

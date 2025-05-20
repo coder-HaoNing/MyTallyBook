@@ -9,6 +9,7 @@ import android.view.Window;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -23,8 +24,12 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.mytallybook.R;
 import com.example.mytallybook.adapter.ExpenseRecordAdapter;
+import com.example.mytallybook.database.ExpenseRecordDataAccess;
 import com.example.mytallybook.model.ExpenseRecord;
+import com.example.mytallybook.model.User;
+import com.example.mytallybook.util.CategoryIconUtil;
 import com.example.mytallybook.viewmodel.ExpenseViewModel;
+import com.example.mytallybook.viewmodel.UserViewModel;
 
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
@@ -35,11 +40,13 @@ import java.util.Locale;
 public class BillsFragment extends Fragment implements ExpenseRecordAdapter.OnDeleteClickListener {
 
     private ExpenseViewModel expenseViewModel;
+    private UserViewModel userViewModel;
     private RecyclerView recyclerView;
     private ExpenseRecordAdapter adapter;
     private TextView textViewIncome, textViewExpense, textViewBalance;
     private TextView textViewCurrentMonth, textViewMonthStatistic;
     private ImageButton buttonPrevMonth, buttonNextMonth;
+    private ImageButton buttonRefresh; // 添加刷新按钮引用
     private DecimalFormat decimalFormat = new DecimalFormat("¥#,##0.00");
     private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.CHINA);
     private SimpleDateFormat monthFormat = new SimpleDateFormat("yyyy年M月", Locale.CHINA);
@@ -57,6 +64,7 @@ public class BillsFragment extends Fragment implements ExpenseRecordAdapter.OnDe
         textViewMonthStatistic = view.findViewById(R.id.textViewMonthStatistic);
         buttonPrevMonth = view.findViewById(R.id.buttonPrevMonth);
         buttonNextMonth = view.findViewById(R.id.buttonNextMonth);
+        buttonRefresh = view.findViewById(R.id.buttonRefresh); // 初始化刷新按钮
         recyclerView = view.findViewById(R.id.recyclerViewRecords);
         
         // 设置RecyclerView
@@ -73,6 +81,7 @@ public class BillsFragment extends Fragment implements ExpenseRecordAdapter.OnDe
         
         // 初始化ViewModel
         expenseViewModel = new ViewModelProvider(requireActivity()).get(ExpenseViewModel.class);
+        userViewModel = new ViewModelProvider(requireActivity()).get(UserViewModel.class);
         
         // 设置月份选择器
         setupMonthSelector();
@@ -85,6 +94,23 @@ public class BillsFragment extends Fragment implements ExpenseRecordAdapter.OnDe
         
         // 设置删除按钮点击事件
         adapter.setOnDeleteClickListener(this);
+        
+        // 设置刷新按钮点击事件
+        buttonRefresh.setOnClickListener(v -> refreshData());
+    }
+    
+    // 添加刷新数据的方法
+    private void refreshData() {
+        if (getContext() == null) return;
+        
+        // 显示加载中提示
+        Toast.makeText(getContext(), "正在刷新数据...", Toast.LENGTH_SHORT).show();
+        
+        // 手动触发数据刷新
+        expenseViewModel.refreshData();
+        
+        // 如果需要，可以在这里添加刷新成功的回调通知
+        Toast.makeText(getContext(), "数据已刷新", Toast.LENGTH_SHORT).show();
     }
     
     // 设置月份选择器
@@ -156,6 +182,9 @@ public class BillsFragment extends Fragment implements ExpenseRecordAdapter.OnDe
         Button buttonDelete = dialog.findViewById(R.id.buttonDelete);
         Button buttonSave = dialog.findViewById(R.id.buttonSave);
         
+        // 获取类别图标视图
+        ImageView imageViewDetailCategoryIcon = dialog.findViewById(R.id.imageViewDetailCategoryIcon);
+        
         // 编辑模式下的输入控件
         LinearLayout layoutViewMode = dialog.findViewById(R.id.layoutViewMode);
         LinearLayout layoutEditMode = dialog.findViewById(R.id.layoutEditMode);
@@ -178,12 +207,16 @@ public class BillsFragment extends Fragment implements ExpenseRecordAdapter.OnDe
         textViewDetailCategory.setText(record.getCategory());
         textViewDetailDate.setText(dateFormat.format(record.getDate()));
         
+        // 设置类别图标
+        int iconRes = CategoryIconUtil.getCategoryIcon(record.getCategory(), record.isIncome());
+        imageViewDetailCategoryIcon.setImageResource(iconRes);
+        
         // 设置金额，根据收入/支出设置颜色
         String amountText = record.isIncome() ? 
                 "+" + decimalFormat.format(record.getAmount()) : 
                 "-" + decimalFormat.format(record.getAmount());
         textViewDetailAmount.setText(amountText);
-        textViewDetailAmount.setTextColor(record.isIncome() ? 0xFF4CAF50 : 0xFFF44336);
+        textViewDetailAmount.setTextColor(CategoryIconUtil.getCategoryColor(record.isIncome()));
         
         // 设置备注，如果没有备注则隐藏该部分
         String note = record.getNote();
@@ -203,9 +236,23 @@ public class BillsFragment extends Fragment implements ExpenseRecordAdapter.OnDe
         
         // 设置删除按钮点击事件
         buttonDelete.setOnClickListener(v -> {
-            expenseViewModel.delete(record);
-            Toast.makeText(getContext(), "已删除记录", Toast.LENGTH_SHORT).show();
-            dialog.dismiss();
+            // 使用带回调的delete方法
+            expenseViewModel.delete(record, new ExpenseRecordDataAccess.DeleteCallback() {
+                @Override
+                public void onDeleteSuccess() {
+                    requireActivity().runOnUiThread(() -> {
+                        Toast.makeText(getContext(), "已删除记录", Toast.LENGTH_SHORT).show();
+                        dialog.dismiss();
+                    });
+                }
+
+                @Override
+                public void onDeleteFailed(String errorMessage) {
+                    requireActivity().runOnUiThread(() -> {
+                        Toast.makeText(getContext(), "删除失败: " + errorMessage, Toast.LENGTH_SHORT).show();
+                    });
+                }
+            });
         });
         
         // 设置编辑按钮点击事件
@@ -312,13 +359,32 @@ public class BillsFragment extends Fragment implements ExpenseRecordAdapter.OnDe
                 String newNote = editTextNote.getText().toString();
                 Date newDate = calendar.getTime();
                 
+                // 获取当前用户
+                User currentUser = userViewModel.getCurrentUser().getValue();
+                int userId = currentUser != null ? currentUser.getId() : 1; // 默认用户ID为1
+                
                 // 更新记录
-                ExpenseRecord updatedRecord = new ExpenseRecord(amount, isIncome, category, newDate, newNote);
+                ExpenseRecord updatedRecord = new ExpenseRecord(amount, category, newDate, newNote, userId);
+                updatedRecord.setIncome(isIncome);
                 updatedRecord.setId(record.getId()); // 保留原记录ID
                 
-                expenseViewModel.update(updatedRecord);
-                Toast.makeText(getContext(), "已更新记录", Toast.LENGTH_SHORT).show();
-                dialog.dismiss();
+                // 使用带回调的update方法
+                expenseViewModel.update(updatedRecord, new ExpenseRecordDataAccess.UpdateCallback() {
+                    @Override
+                    public void onUpdateSuccess() {
+                        requireActivity().runOnUiThread(() -> {
+                            Toast.makeText(getContext(), "已更新记录", Toast.LENGTH_SHORT).show();
+                            dialog.dismiss();
+                        });
+                    }
+
+                    @Override
+                    public void onUpdateFailed(String errorMessage) {
+                        requireActivity().runOnUiThread(() -> {
+                            Toast.makeText(getContext(), "更新失败: " + errorMessage, Toast.LENGTH_SHORT).show();
+                        });
+                    }
+                });
             } catch (NumberFormatException e) {
                 Toast.makeText(getContext(), "请输入有效金额", Toast.LENGTH_SHORT).show();
             }
@@ -348,8 +414,21 @@ public class BillsFragment extends Fragment implements ExpenseRecordAdapter.OnDe
     @Override
     public void onDeleteClick(ExpenseRecord record) {
         if (record != null) {
-            expenseViewModel.delete(record);
-            Toast.makeText(getContext(), "已删除记录", Toast.LENGTH_SHORT).show();
+            expenseViewModel.delete(record, new ExpenseRecordDataAccess.DeleteCallback() {
+                @Override
+                public void onDeleteSuccess() {
+                    requireActivity().runOnUiThread(() -> {
+                        Toast.makeText(getContext(), "已删除记录", Toast.LENGTH_SHORT).show();
+                    });
+                }
+
+                @Override
+                public void onDeleteFailed(String errorMessage) {
+                    requireActivity().runOnUiThread(() -> {
+                        Toast.makeText(getContext(), "删除失败: " + errorMessage, Toast.LENGTH_SHORT).show();
+                    });
+                }
+            });
         }
     }
 }

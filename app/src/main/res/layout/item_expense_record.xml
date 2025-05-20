@@ -13,6 +13,16 @@
         android:orientation="horizontal"
         android:padding="12dp">
 
+        <!-- 添加类别图标 -->
+        <ImageView
+            android:id="@+id/imageViewCategoryIcon"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="center_vertical"
+            android:layout_marginEnd="12dp"
+            android:contentDescription="类别图标"
+            android:src="@android:drawable/ic_menu_info_details" />
+
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -31,7 +41,6 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:visibility="gone"
                 android:text="分类"
                 android:textSize="14sp" />
 

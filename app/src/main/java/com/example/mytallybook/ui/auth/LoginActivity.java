@@ -14,13 +14,15 @@ import androidx.lifecycle.ViewModelProvider;
 
 import com.example.mytallybook.MainActivity;
 import com.example.mytallybook.R;
+import com.example.mytallybook.database.UserDataAccess;
+import com.example.mytallybook.model.User;
 import com.example.mytallybook.viewmodel.UserViewModel;
 import com.google.android.material.textfield.TextInputEditText;
 
 public class LoginActivity extends AppCompatActivity {
     
     private UserViewModel userViewModel;
-    private TextInputEditText editTextPhone, editTextPassword;
+    private TextInputEditText editTextUsernameOrPhone, editTextPassword;
     private Button buttonLogin;
     private TextView textViewRegister;
     
@@ -30,7 +32,7 @@ public class LoginActivity extends AppCompatActivity {
         setContentView(R.layout.activity_login);
         
         // 初始化视图
-        editTextPhone = findViewById(R.id.editTextPhone);
+        editTextUsernameOrPhone = findViewById(R.id.editTextPhone);
         editTextPassword = findViewById(R.id.editTextPassword);
         buttonLogin = findViewById(R.id.buttonLogin);
         textViewRegister = findViewById(R.id.textViewRegister);
@@ -40,7 +42,7 @@ public class LoginActivity extends AppCompatActivity {
         
         // 检查用户是否已登录
         SharedPreferences prefs = getSharedPreferences("user_prefs", MODE_PRIVATE);
-        if (prefs.contains("phone_number")) {
+        if (prefs.contains("username")) {
             // 自动跳转到主页面
             navigateToMainActivity();
         }
@@ -65,17 +67,12 @@ public class LoginActivity extends AppCompatActivity {
     }
     
     private void loginUser() {
-        String phoneNumber = editTextPhone.getText().toString().trim();
+        String usernameOrPhone = editTextUsernameOrPhone.getText().toString().trim();
         String password = editTextPassword.getText().toString().trim();
         
         // 输入验证
-        if (TextUtils.isEmpty(phoneNumber)) {
-            editTextPhone.setError("请输入手机号");
-            return;
-        }
-        
-        if (phoneNumber.length() != 11) {
-            editTextPhone.setError("请输入11位手机号码");
+        if (TextUtils.isEmpty(usernameOrPhone)) {
+            editTextUsernameOrPhone.setError("请输入用户名或手机号");
             return;
         }
         
@@ -84,25 +81,50 @@ public class LoginActivity extends AppCompatActivity {
             return;
         }
         
-        // 尝试登录
-        userViewModel.login(phoneNumber, password).observe(this, user -> {
-            if (user != null) {
-                // 登录成功，保存用户信息
-                saveUserSession(phoneNumber, user.getUsername());
-                // 跳转到主页面
-                navigateToMainActivity();
-            } else {
-                // 登录失败
-                Toast.makeText(LoginActivity.this, "手机号或密码不正确", Toast.LENGTH_SHORT).show();
+        // 显示加载进度
+        buttonLogin.setEnabled(false);
+        buttonLogin.setText("登录中...");
+        
+        // 尝试登录，允许使用用户名或手机号
+        userViewModel.loginWithPhoneOrUsername(usernameOrPhone, password, new UserDataAccess.GetUserCallback() {
+            @Override
+            public void onUserFound(User user) {
+                runOnUiThread(() -> {
+                    // 登录成功，保存用户信息
+                    saveUserSession(user);
+                    
+                    // 重置按钮状态
+                    buttonLogin.setEnabled(true);
+                    buttonLogin.setText("登录");
+                    
+                    // 跳转到主页面
+                    navigateToMainActivity();
+                });
+            }
+
+            @Override
+            public void onUserNotFound() {
+                runOnUiThread(() -> {
+                    // 登录失败
+                    Toast.makeText(LoginActivity.this, "用户名/手机号或密码不正确", Toast.LENGTH_SHORT).show();
+                    
+                    // 重置按钮状态
+                    buttonLogin.setEnabled(true);
+                    buttonLogin.setText("登录");
+                });
             }
         });
     }
     
-    private void saveUserSession(String phoneNumber, String username) {
+    private void saveUserSession(User user) {
         SharedPreferences.Editor editor = getSharedPreferences("user_prefs", MODE_PRIVATE).edit();
-        editor.putString("phone_number", phoneNumber);
-        editor.putString("username", username);
+        editor.putString("username", user.getUsername());
+        editor.putInt("user_id", user.getId());
+        editor.putString("phone_number", user.getPhoneNumber()); // 保存手机号
         editor.apply();
+        
+        // 设置当前用户
+        userViewModel.setCurrentUser(user);
     }
     
     private void navigateToMainActivity() {

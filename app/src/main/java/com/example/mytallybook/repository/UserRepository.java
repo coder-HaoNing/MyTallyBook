@@ -1,78 +1,62 @@
 package com.example.mytallybook.repository;
 
-import android.app.Application;
-import android.os.AsyncTask;
+import android.content.Context;
 
 import androidx.lifecycle.LiveData;
 
-import com.example.mytallybook.database.AppDatabase;
-import com.example.mytallybook.database.UserDao;
+import com.example.mytallybook.database.UserDataAccess;
 import com.example.mytallybook.model.User;
 
-import java.util.concurrent.ExecutionException;
-
 /**
- * 用户数据仓库类
+ * 用户数据仓库类，处理用户相关的数据操作
  */
 public class UserRepository {
-    private UserDao userDao;
-    
-    public UserRepository(Application application) {
-        AppDatabase database = AppDatabase.getInstance(application);
-        userDao = database.userDao();
+    private final UserDataAccess userDataAccess;
+    private static UserRepository instance;
+
+    private UserRepository(Context context) {
+        userDataAccess = new UserDataAccess(context);
     }
-    
-    // 通过手机号获取用户
-    public LiveData<User> getUserByPhone(String phoneNumber) {
-        return userDao.getUserByPhone(phoneNumber);
-    }
-    
-    // 用户登录
-    public LiveData<User> login(String phoneNumber, String password) {
-        return userDao.login(phoneNumber, password);
-    }
-    
-    // 注册新用户
-    public void register(User user) {
-        new InsertUserAsyncTask(userDao).execute(user);
-    }
-    
-    // 检查手机号是否已存在
-    public boolean isPhoneNumberExists(String phoneNumber) {
-        try {
-            return new CheckPhoneExistsAsyncTask(userDao).execute(phoneNumber).get() > 0;
-        } catch (ExecutionException | InterruptedException e) {
-            e.printStackTrace();
-            return false;
+
+    public static synchronized UserRepository getInstance(Context context) {
+        if (instance == null) {
+            instance = new UserRepository(context.getApplicationContext());
         }
+        return instance;
     }
-    
-    // 异步插入用户任务
-    private static class InsertUserAsyncTask extends AsyncTask<User, Void, Void> {
-        private UserDao userDao;
-        
-        InsertUserAsyncTask(UserDao userDao) {
-            this.userDao = userDao;
-        }
-        
-        @Override
-        protected Void doInBackground(User... users) {
-            userDao.insert(users[0]);
-            return null;
-        }
+
+    // 注册用户
+    public void registerUser(User user, UserDataAccess.InsertCallback callback) {
+        userDataAccess.insert(user, callback);
     }
-    
-    // 异步检查手机号是否存在任务
-    private static class CheckPhoneExistsAsyncTask extends AsyncTask<String, Void, Integer> {
-        private UserDao userDao;
-        
-        CheckPhoneExistsAsyncTask(UserDao userDao) {
-            this.userDao = userDao;
-        }
-        
-        @Override
-        protected Integer doInBackground(String... phoneNumbers) {
-            return userDao.checkPhoneExists(phoneNumbers[0]);
-        }
+
+    // 用户登录 (仅用户名)
+    public void loginUser(String username, String password, UserDataAccess.GetUserCallback callback) {
+        userDataAccess.getUserByCredentials(username, password, callback);
+    }
+
+    // 用户登录 (支持用户名或手机号)
+    public void loginWithPhoneOrUsername(String usernameOrPhone, String password, UserDataAccess.GetUserCallback callback) {
+        userDataAccess.getUserByPhoneOrUsername(usernameOrPhone, password, callback);
+    }
+
+    // 更新用户信息
+    public void updateUser(User user, UserDataAccess.UpdateCallback callback) {
+        userDataAccess.update(user, callback);
+    }
+
+    // 获取当前用户信息（LiveData）
+    public LiveData<User> getCurrentUser() {
+        return userDataAccess.getCurrentUserLiveData();
+    }
+
+    // 设置当前用户
+    public void setCurrentUser(User user) {
+        userDataAccess.setCurrentUser(user);
+    }
+
+    // 通过ID获取用户
+    public void getUserById(int userId, UserDataAccess.GetUserCallback callback) {
+        userDataAccess.getUserById(userId, callback);
     }
 }

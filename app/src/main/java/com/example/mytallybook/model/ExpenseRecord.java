@@ -1,6 +1,7 @@
 package com.example.mytallybook.model;
 
 import androidx.room.Entity;
+import androidx.room.Ignore;
 import androidx.room.PrimaryKey;
 
 import java.util.Date;
@@ -18,13 +19,29 @@ public class ExpenseRecord {
     private String category; // 分类
     private Date date; // 日期
     private String note; // 备注
+    private int userId; // 添加用户ID，关联到User表
     
-    public ExpenseRecord(double amount, boolean isIncome, String category, Date date, String note) {
+    // 默认构造函数供Room使用
+    public ExpenseRecord() {
+    }
+    
+    @Ignore // 标记此构造函数被Room忽略
+    public ExpenseRecord(double amount, String category, Date date, String note, int userId) {
+        this.amount = amount;
+        this.category = category;
+        this.date = date;
+        this.note = note;
+        this.userId = userId;
+    }
+    
+    @Ignore // 标记此构造函数被Room忽略
+    public ExpenseRecord(double amount, boolean isIncome, String category, Date date, String note, int userId) {
         this.amount = amount;
         this.isIncome = isIncome;
         this.category = category;
         this.date = date;
         this.note = note;
+        this.userId = userId;
     }
     
     public long getId() {
@@ -73,5 +90,13 @@ public class ExpenseRecord {
     
     public void setNote(String note) {
         this.note = note;
+    }
+    
+    public int getUserId() {
+        return userId;
+    }
+    
+    public void setUserId(int userId) {
+        this.userId = userId;
     }
 }

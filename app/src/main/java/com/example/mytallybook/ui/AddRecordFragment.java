@@ -17,8 +17,11 @@ import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.mytallybook.R;
+import com.example.mytallybook.database.ExpenseRecordDataAccess;
 import com.example.mytallybook.model.ExpenseRecord;
+import com.example.mytallybook.model.User;
 import com.example.mytallybook.viewmodel.ExpenseViewModel;
+import com.example.mytallybook.viewmodel.UserViewModel;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.textfield.TextInputEditText;
 
@@ -30,6 +33,7 @@ import java.util.Locale;
 public class AddRecordFragment extends Fragment {
 
     private ExpenseViewModel viewModel;
+    private UserViewModel userViewModel;
     private TabLayout tabLayout;
     private RadioGroup radioGroupExpenseCategory;
     private RadioGroup radioGroupIncomeCategory;
@@ -68,6 +72,7 @@ public class AddRecordFragment extends Fragment {
         
         // 初始化ViewModel
         viewModel = new ViewModelProvider(requireActivity()).get(ExpenseViewModel.class);
+        userViewModel = new ViewModelProvider(requireActivity()).get(UserViewModel.class);
         
         // 设置Tab切换监听
         tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
@@ -161,14 +166,34 @@ public class AddRecordFragment extends Fragment {
             
             // 创建记录并保存
             Date recordDate = selectedDate.getTime();
-            ExpenseRecord record = new ExpenseRecord(amount, isIncome, category, recordDate, note);
-            viewModel.insert(record);
             
-            // 提示保存成功
-            Toast.makeText(requireContext(), "记录已保存", Toast.LENGTH_SHORT).show();
+            // 获取当前用户
+            User currentUser = userViewModel.getCurrentUser().getValue();
+            int userId = currentUser != null ? currentUser.getId() : 1; // 默认用户ID为1
             
-            // 清空输入
-            clearInputs();
+            // 创建记录对象
+            ExpenseRecord record = new ExpenseRecord(amount, category, recordDate, note, userId);
+            record.setIncome(isIncome);
+            
+            // 使用回调保存记录
+            viewModel.insert(record, new ExpenseRecordDataAccess.InsertCallback() {
+                @Override
+                public void onInsertSuccess(ExpenseRecord record) {
+                    requireActivity().runOnUiThread(() -> {
+                        // 提示保存成功
+                        Toast.makeText(requireContext(), "记录已保存", Toast.LENGTH_SHORT).show();
+                        // 清空输入
+                        clearInputs();
+                    });
+                }
+
+                @Override
+                public void onInsertFailed(String errorMessage) {
+                    requireActivity().runOnUiThread(() -> {
+                        Toast.makeText(requireContext(), "保存失败: " + errorMessage, Toast.LENGTH_SHORT).show();
+                    });
+                }
+            });
             
         } catch (NumberFormatException e) {
             Toast.makeText(requireContext(), "请输入有效金额", Toast.LENGTH_SHORT).show();

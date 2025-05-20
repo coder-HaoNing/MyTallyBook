@@ -1,131 +1,80 @@
 package com.example.mytallybook.repository;
 
-import android.app.Application;
-import android.os.AsyncTask;
+import android.content.Context;
 
 import androidx.lifecycle.LiveData;
 
-import com.example.mytallybook.database.AppDatabase;
-import com.example.mytallybook.database.ExpenseRecordDao;
+import com.example.mytallybook.database.ExpenseRecordDataAccess;
 import com.example.mytallybook.model.ExpenseRecord;
 
 import java.util.Date;
 import java.util.List;
 
 /**
- * 记账数据仓库类
+ * 支出记录仓库类，处理支出记录相关的数据操作
  */
 public class ExpenseRepository {
-    private ExpenseRecordDao expenseRecordDao;
-    private LiveData<List<ExpenseRecord>> allRecords;
-    private LiveData<Double> totalIncome;
-    private LiveData<Double> totalExpense;
-    
-    public ExpenseRepository(Application application) {
-        AppDatabase database = AppDatabase.getInstance(application);
-        expenseRecordDao = database.expenseRecordDao();
-        allRecords = expenseRecordDao.getAllRecords();
-        totalIncome = expenseRecordDao.getTotalIncome();
-        totalExpense = expenseRecordDao.getTotalExpense();
+    private final ExpenseRecordDataAccess expenseDataAccess;
+    private static ExpenseRepository instance;
+
+    private ExpenseRepository(Context context) {
+        expenseDataAccess = new ExpenseRecordDataAccess(context);
+    }
+
+    public static synchronized ExpenseRepository getInstance(Context context) {
+        if (instance == null) {
+            instance = new ExpenseRepository(context.getApplicationContext());
+        }
+        return instance;
+    }
+
+    // 添加新的支出记录
+    public void addExpense(ExpenseRecord record, ExpenseRecordDataAccess.InsertCallback callback) {
+        expenseDataAccess.insert(record, callback);
+    }
+
+    // 更新支出记录
+    public void updateExpense(ExpenseRecord record, ExpenseRecordDataAccess.UpdateCallback callback) {
+        expenseDataAccess.update(record, callback);
+    }
+
+    // 删除支出记录
+    public void deleteExpense(ExpenseRecord record, ExpenseRecordDataAccess.DeleteCallback callback) {
+        expenseDataAccess.delete(record, callback);
+    }
+
+    // 获取用户的所有支出记录
+    public LiveData<List<ExpenseRecord>> getAllExpensesForUser(int userId) {
+        return expenseDataAccess.getAllExpensesForUser(userId);
     }
     
-    // 获取所有记录
-    public LiveData<List<ExpenseRecord>> getAllRecords() {
-        return allRecords;
+    // 获取所有支出记录
+    public LiveData<List<ExpenseRecord>> getAllExpenses() {
+        return expenseDataAccess.getAllExpenses();
     }
     
-    // 获取指定日期范围的记录
+    // 通过ID获取支出记录
+    public void getExpenseById(int expenseId, ExpenseRecordDataAccess.GetExpenseCallback callback) {
+        expenseDataAccess.getExpenseById(expenseId, callback);
+    }
+    
+    // 按日期范围获取记录
     public LiveData<List<ExpenseRecord>> getRecordsByDateRange(Date startDate, Date endDate) {
-        return expenseRecordDao.getRecordsByDateRange(startDate, endDate);
+        return expenseDataAccess.getRecordsByDateRange(startDate, endDate);
     }
     
-    // 获取特定类型的记录（收入/支出）
-    public LiveData<List<ExpenseRecord>> getRecordsByType(boolean isIncome) {
-        return expenseRecordDao.getRecordsByType(isIncome);
+    // 按日期范围获取用户的记录
+    public LiveData<List<ExpenseRecord>> getRecordsByDateRangeForUser(int userId, Date startDate, Date endDate) {
+        return expenseDataAccess.getRecordsByDateRangeForUser(userId, startDate, endDate);
     }
     
-    // 获取总收入
-    public LiveData<Double> getTotalIncome() {
-        return totalIncome;
-    }
-    
-    // 获取总支出
-    public LiveData<Double> getTotalExpense() {
-        return totalExpense;
-    }
-    
-    // 获取特定日期范围内的总收入
+    // 按日期范围获取总收入
     public LiveData<Double> getTotalIncomeByDateRange(Date startDate, Date endDate) {
-        return expenseRecordDao.getTotalIncomeByDateRange(startDate, endDate);
+        return expenseDataAccess.getTotalIncomeByDateRange(startDate, endDate);
     }
     
-    // 获取特定日期范围内的总支出
+    // 按日期范围获取总支出
     public LiveData<Double> getTotalExpenseByDateRange(Date startDate, Date endDate) {
-        return expenseRecordDao.getTotalExpenseByDateRange(startDate, endDate);
-    }
-    
-    // 获取特定记录
-    public LiveData<ExpenseRecord> getRecordById(long id) {
-        return expenseRecordDao.getRecordById(id);
-    }
-    
-    // 插入记录
-    public void insert(ExpenseRecord record) {
-        new InsertAsyncTask(expenseRecordDao).execute(record);
-    }
-    
-    // 更新记录
-    public void update(ExpenseRecord record) {
-        new UpdateAsyncTask(expenseRecordDao).execute(record);
-    }
-    
-    // 删除记录
-    public void delete(ExpenseRecord record) {
-        new DeleteAsyncTask(expenseRecordDao).execute(record);
-    }
-    
-    // 异步插入任务
-    private static class InsertAsyncTask extends AsyncTask<ExpenseRecord, Void, Void> {
-        private ExpenseRecordDao asyncTaskDao;
-        
-        InsertAsyncTask(ExpenseRecordDao dao) {
-            asyncTaskDao = dao;
-        }
-        
-        @Override
-        protected Void doInBackground(ExpenseRecord... expenseRecords) {
-            asyncTaskDao.insert(expenseRecords[0]);
-            return null;
-        }
-    }
-    
-    // 异步更新任务
-    private static class UpdateAsyncTask extends AsyncTask<ExpenseRecord, Void, Void> {
-        private ExpenseRecordDao asyncTaskDao;
-        
-        UpdateAsyncTask(ExpenseRecordDao dao) {
-            asyncTaskDao = dao;
-        }
-        
-        @Override
-        protected Void doInBackground(ExpenseRecord... expenseRecords) {
-            asyncTaskDao.update(expenseRecords[0]);
-            return null;
-        }
-    }
-    
-    // 异步删除任务
-    private static class DeleteAsyncTask extends AsyncTask<ExpenseRecord, Void, Void> {
-        private ExpenseRecordDao asyncTaskDao;
-        
-        DeleteAsyncTask(ExpenseRecordDao dao) {
-            asyncTaskDao = dao;
-        }
-        
-        @Override
-        protected Void doInBackground(ExpenseRecord... expenseRecords) {
-            asyncTaskDao.delete(expenseRecords[0]);
-            return null;
-        }
+        return expenseDataAccess.getTotalExpenseByDateRange(startDate, endDate);
     }
 }
