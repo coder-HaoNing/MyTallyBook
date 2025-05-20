@@ -1,5 +1,6 @@
 package com.example.mytallybook.ui;
 
+import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -7,6 +8,9 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
+import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -23,6 +27,7 @@ import com.example.mytallybook.adapter.ExpenseRecordAdapter;
 import com.example.mytallybook.model.ExpenseRecord;
 import com.example.mytallybook.ui.auth.LoginActivity;
 import com.example.mytallybook.ui.settings.SettingsActivity;
+import com.example.mytallybook.util.ShareUtil;
 import com.example.mytallybook.viewmodel.ExpenseViewModel;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -44,9 +49,12 @@ public class MineFragment extends Fragment {
     private TextView textViewUsername; // 添加用户名显示
     private MaterialButton buttonLogout; // 添加退出登录按钮
     private MaterialButton buttonSettings; // 添加设置按钮
+    private ImageButton buttonRefreshMine; // 添加刷新按钮
     
     private List<ExpenseRecord> recordList;
     private DecimalFormat decimalFormat = new DecimalFormat("¥#,##0.00");
+    private Date startDate; // 开始日期，用于获取统计数据
+    private Date endDate; // 结束日期，用于获取统计数据
 
     @Nullable
     @Override
@@ -59,9 +67,10 @@ public class MineFragment extends Fragment {
         textViewTotalBalance = view.findViewById(R.id.textViewTotalBalance);
         recyclerView = view.findViewById(R.id.recyclerViewDetailRecords);
         fabShare = view.findViewById(R.id.fabShare);
-        textViewUsername = view.findViewById(R.id.textViewUsername); // 添加用户名显示
-        buttonLogout = view.findViewById(R.id.buttonLogout); // 添加退出登录按钮
-        buttonSettings = view.findViewById(R.id.buttonSettings); // 添加设置按钮
+        textViewUsername = view.findViewById(R.id.textViewUsername); 
+        buttonLogout = view.findViewById(R.id.buttonLogout); 
+        buttonSettings = view.findViewById(R.id.buttonSettings);
+        buttonRefreshMine = view.findViewById(R.id.buttonRefreshMine); // 初始化刷新按钮
         
         // 设置RecyclerView
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
@@ -83,20 +92,53 @@ public class MineFragment extends Fragment {
         // 初始化ViewModel
         viewModel = new ViewModelProvider(requireActivity()).get(ExpenseViewModel.class);
         
+        // 创建日期范围，用于获取所有时间段的收支统计
+        setupDateRange();
+        
+        // 观察数据变化
+        setupObservers();
+        
+        // 设置点击事件监听
+        adapter.setOnItemClickListener(record -> showShareDialog(record));
+        
+        // 设置分享按钮监听
+        fabShare.setOnClickListener(v -> shareAllRecords());
+        
+        // 添加退出登录按钮点击监听
+        buttonLogout.setOnClickListener(v -> showLogoutConfirmation());
+        
+        // 添加设置按钮点击监听
+        buttonSettings.setOnClickListener(v -> openSettings());
+        
+        // 添加刷新按钮点击监听
+        buttonRefreshMine.setOnClickListener(v -> refreshData());
+    }
+    
+    @Override
+    public void onResume() {
+        super.onResume();
+        // 页面恢复时刷新数据
+        refreshData();
+    }
+    
+    // 设置日期范围
+    private void setupDateRange() {
+        Calendar calendar = Calendar.getInstance();
+        endDate = calendar.getTime(); // 当前日期作为结束日期
+        
+        calendar.set(Calendar.YEAR, 2000);
+        calendar.set(Calendar.MONTH, 0);
+        calendar.set(Calendar.DAY_OF_MONTH, 1);
+        startDate = calendar.getTime(); // 2000年1月1日作为开始日期
+    }
+    
+    // 设置观察者
+    private void setupObservers() {
         // 观察数据变化
         viewModel.getAllRecords().observe(getViewLifecycleOwner(), records -> {
             recordList = records;
             adapter.setExpenseRecords(records);
         });
-        
-        // 创建日期范围，用于获取所有时间段的收支统计
-        Calendar calendar = Calendar.getInstance();
-        Date endDate = calendar.getTime(); // 当前日期作为结束日期
-        
-        calendar.set(Calendar.YEAR, 2000);
-        calendar.set(Calendar.MONTH, 0);
-        calendar.set(Calendar.DAY_OF_MONTH, 1);
-        Date startDate = calendar.getTime(); // 2000年1月1日作为开始日期
         
         // 观察总收入，添加日期参数
         viewModel.getTotalIncome(startDate, endDate).observe(getViewLifecycleOwner(), income -> {
@@ -111,18 +153,20 @@ public class MineFragment extends Fragment {
             textViewTotalExpense.setText(decimalFormat.format(expenseValue));
             updateTotalBalance();
         });
+    }
+    
+    // 刷新数据
+    private void refreshData() {
+        if (getContext() == null || viewModel == null) return;
         
-        // 设置点击事件监听
-        adapter.setOnItemClickListener(record -> showShareDialog(record));
+        // 显示加载中提示
+        Toast.makeText(getContext(), "正在刷新数据...", Toast.LENGTH_SHORT).show();
         
-        // 设置分享按钮监听
-        fabShare.setOnClickListener(v -> shareAllRecords());
+        // 手动触发数据刷新
+        viewModel.refreshData();
         
-        // 添加退出登录按钮点击监听
-        buttonLogout.setOnClickListener(v -> showLogoutConfirmation());
-        
-        // 添加设置按钮点击监听
-        buttonSettings.setOnClickListener(v -> openSettings());
+        // 刷新完成提示
+        Toast.makeText(getContext(), "数据已刷新", Toast.LENGTH_SHORT).show();
     }
     
     // 打开设置页面
@@ -184,7 +228,7 @@ public class MineFragment extends Fragment {
                 "\n时间：" + sdf.format(record.getDate()) +
                 (record.getNote().isEmpty() ? "" : "\n备注：" + record.getNote());
         
-        shareText(message);
+        showSharePlatformDialog(message, "分享记账明细");
     }
     
     // 分享所有记录
@@ -224,22 +268,48 @@ public class MineFragment extends Fragment {
             }
         }
         
-        shareText(sb.toString());
+        showSharePlatformDialog(sb.toString(), "分享所有记账记录");
     }
     
-    // 分享文本内容
-    private void shareText(String text) {
-        Intent shareIntent = new Intent(Intent.ACTION_SEND);
-        shareIntent.setType("text/plain");
-        shareIntent.putExtra(Intent.EXTRA_TEXT, text);
+    /**
+     * 显示分享平台选择对话框
+     * @param content 要分享的内容
+     * @param title 分享标题
+     */
+    private void showSharePlatformDialog(String content, String title) {
+        if (getContext() == null) return;
         
-        // 创建选择器来选择分享方式
-        Intent chooser = Intent.createChooser(shareIntent, "分享到");
+        Dialog dialog = new Dialog(getContext());
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_share);
+        dialog.setCancelable(true);
         
-        if (shareIntent.resolveActivity(requireActivity().getPackageManager()) != null) {
-            startActivity(chooser);
-        } else {
-            Toast.makeText(requireContext(), "未找到可分享的应用", Toast.LENGTH_SHORT).show();
-        }
+        LinearLayout layoutShareWechat = dialog.findViewById(R.id.layoutShareWechat);
+        LinearLayout layoutShareQQ = dialog.findViewById(R.id.layoutShareQQ);
+        LinearLayout layoutShareMore = dialog.findViewById(R.id.layoutShareMore);
+        
+        // 设置微信分享
+        layoutShareWechat.setOnClickListener(v -> {
+            boolean success = ShareUtil.shareToWeChat(requireContext(), content, title);
+            if (success) {
+                dialog.dismiss();
+            }
+        });
+        
+        // 设置QQ分享
+        layoutShareQQ.setOnClickListener(v -> {
+            boolean success = ShareUtil.shareToQQ(requireContext(), content, title);
+            if (success) {
+                dialog.dismiss();
+            }
+        });
+        
+        // 设置更多分享选项（使用系统分享菜单）
+        layoutShareMore.setOnClickListener(v -> {
+            ShareUtil.shareTextBySystem(requireContext(), content, title);
+            dialog.dismiss();
+        });
+        
+        dialog.show();
     }
 }

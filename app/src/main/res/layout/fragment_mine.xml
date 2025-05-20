@@ -192,6 +192,20 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/cardViewSummary" />
 
+    <!-- 添加刷新按钮 -->
+    <ImageButton
+        android:id="@+id/buttonRefreshMine"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="16dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="刷新数据"
+        android:padding="8dp"
+        android:src="@android:drawable/ic_popup_sync"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/textViewDetailTitle"
+        app:layout_constraintBottom_toBottomOf="@+id/textViewDetailTitle" />
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerViewDetailRecords"
         android:layout_width="0dp"
